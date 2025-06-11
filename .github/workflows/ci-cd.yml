@@ -1,0 +1,95 @@
+name: CI/CD Pipeline for EasyInfoDrop
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y qtbase5-dev qt5-qmake libqt5widgets5 libx11-dev cmake build-essential
+
+      - name: Configure CMake
+        run: |
+          mkdir build
+          cd build
+          cmake ..
+
+      - name: Build
+        run: |
+          cd build
+          make
+
+      - name: Upload executable artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: EasyInfoDrop
+          path: build/EasyInfoDrop
+          if-no-files-found: error
+
+      - name: Upload config artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: config
+          path: config/config.json
+          if-no-files-found: error
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download executable artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: EasyInfoDrop
+          path: release
+
+      - name: Download config artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: config
+          path: release
+
+      - name: Set executable permissions
+        run: chmod +x release/EasyInfoDrop
+
+      - name: Create tarball
+        run: tar -czvf release/EasyInfoDrop-${{ github.ref_name }}-linux.tar.gz -C release EasyInfoDrop config.json
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref_name }}
+          release_name: Release ${{ github.ref_name }}
+          draft: true
+          prerelease: true
+
+      - name: Upload Release Asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: release/EasyInfoDrop-${{ github.ref_name }}-linux.tar.gz
+          asset_name: release-easy-info-drop-v${{ github.ref_name }}.tar.gz
+          asset_content_type: application/gzip

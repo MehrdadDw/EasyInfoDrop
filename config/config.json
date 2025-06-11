@@ -1,0 +1,6 @@
+{
+  "items": [
+    {"name": "Name", "value": "John Doe"},
+    {"name": "Email", "value": "john@example.com"}
+  ]
+}

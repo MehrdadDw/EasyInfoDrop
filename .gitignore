@@ -1,0 +1,24 @@
+# Build artifacts
+build/
+*.o
+*.a
+*.so
+*.exe
+EasyInfoDrop
+
+# CMake
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+
+# IDE
+.idea/
+*.suo
+*.user
+
+# Misc
+*.log
+*.bak
+*.swp
+.DS_Store
