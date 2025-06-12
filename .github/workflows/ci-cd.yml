@@ -61,8 +61,8 @@ jobs:
         with:
           tag_name: ${{ github.ref_name }}
           name: Release ${{ github.ref_name }}
-          draft: true
-          prerelease: true
+          draft: false
+          prerelease: false
           files: release/release-easy-info-drop-${{ github.ref_name }}.tar.gz
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
