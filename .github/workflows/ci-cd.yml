@@ -64,5 +64,16 @@ jobs:
           draft: false
           prerelease: false
           files: release/release-easy-info-drop-${{ github.ref_name }}.tar.gz
+          body: |
+            EasyInfoDrop Release ${{ github.ref_name }}
+
+            To run:
+            ```bash
+            tar -xzvf release-easy-info-drop-${{ github.ref_name }}.tar.gz
+            chmod +x EasyInfoDrop
+            ./EasyInfoDrop
+            ```
+
+            Includes `config/config.json` for immediate use.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
