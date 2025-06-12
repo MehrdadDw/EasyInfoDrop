@@ -47,9 +47,9 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: config
-          path: release
+          path: release/config
       - run: chmod +x release/EasyInfoDrop
-      - run: tar -czvf release/EasyInfoDrop-${{ github.ref_name }}-linux.tar.gz -C release EasyInfoDrop config.json
+      - run: tar -czvf release/EasyInfoDrop-${{ github.ref_name }}-linux.tar.gz -C release EasyInfoDrop config/config.json
       - id: create_release
         uses: actions/create-release@v1
         env:
