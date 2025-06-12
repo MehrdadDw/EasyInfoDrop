@@ -2,7 +2,7 @@
 
 ![EasyInfoDrop Demo](EasyInfoDrop.gif)
 
-EasyInfoDrop is a lightweight, Qt-based application designed to streamline your workflow when dealing with repetitive text, such as names, emails, or cover letter snippets. Whether you're filling out web forms, drafting emails, or preparing documents in tools like Microsoft Word, EasyInfoDrop lets you drag and drop pre-configured text directly into your target application, saving time and reducing errors. With a customizable configuration file, you can store and manage frequently used text snippets effortlessly.
+EasyInfoDrop is a lightweight, Qt-based application designed to streamline your workflow when dealing with repetitive text, such as names, emails, or cover letter snippets, and to serve as a handy note-taking app. Whether you're filling out web forms, drafting emails, preparing documents in tools like Microsoft Word, or jotting down notes like study subjects to revisit later, EasyInfoDrop lets you drag and drop pre-configured text directly into your target application, saving time and reducing errors. With a customizable configuration file, you can store and manage frequently used text snippets or notes effortlessly.
 
 ## Features
 
@@ -82,12 +82,13 @@ make
 
 ## Why Use EasyInfoDrop?
 
-EasyInfoDrop is perfect for professionals, students, or anyone who frequently reuses text snippets. For example:
+EasyInfoDrop is perfect for professionals, students, or anyone who frequently reuses text snippets or needs a quick note-taking solution. For example:
+- **Note-Taking**: Save subjects, topics, or ideas to read more about later, then drag and drop them into study apps, emails, or documents when needed.
 - **Job Applications**: Drag your name, email, or cover letter text into online forms or Word documents.
 - **Customer Support**: Quickly insert standard responses or contact details.
 - **Data Entry**: Avoid retyping repetitive information like addresses or IDs.
 
-Say goodbye to manual copying and pasting—EasyInfoDrop makes repetitive text tasks fast, accurate, and hassle-free!
+Say goodbye to manual copying and pasting—EasyInfoDrop makes repetitive text tasks and note management fast, accurate, and hassle-free!
 
 ## Contributing
 
