@@ -190,6 +190,7 @@ private:
 int main(int argc, char* argv[]) {
     json config;
     try {
+        std::filesystem::create_directories("config"); // Create config directory if it doesn't exist
         std::ifstream config_file("config/config.json");
         if (!config_file.is_open()) {
             std::cerr << "Creating default config/config.json" << std::endl;

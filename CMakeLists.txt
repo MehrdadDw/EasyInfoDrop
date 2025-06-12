@@ -28,5 +28,3 @@ FetchContent_MakeAvailable(json)
 add_executable(EasyInfoDrop src/main.cpp)
 target_include_directories(EasyInfoDrop PRIVATE ${CMAKE_SOURCE_DIR}/src ${X11_INCLUDE_DIR})
 target_link_libraries(EasyInfoDrop PRIVATE Qt5::Widgets ${X11_LIBRARIES} nlohmann_json::nlohmann_json)
-
-configure_file(config/config.json config/config.json COPYONLY)
