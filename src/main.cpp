@@ -150,8 +150,7 @@ private slots:
         QString configPath = "config/config.json";
         for (const char* editor : editors) {
             if (QProcess::startDetached(QString::fromUtf8(editor), {configPath})) {
-                std::cerr << "Opened config with " << editor << std::endl;
-                return;
+                std::cerr << "Failed to open editor: " << editor << std::endl;
             }
         }
         std::cerr << "Error: No text editor found." << std::endl;
@@ -193,10 +192,25 @@ int main(int argc, char* argv[]) {
     try {
         std::ifstream config_file("config/config.json");
         if (!config_file.is_open()) {
-            std::cerr << "Error: config/config.json not found" << std::endl;
-            return 1;
+            std::cerr << "Creating default config/config.json" << std::endl;
+            config = {
+                {"items", {
+                    {{"name", "Name"}, {"value", "John Doe"}},
+                    {{"name", "Email"}, {"value", "john@example.com"}}
+                }}
+            };
+            std::ofstream out_file("config/config.json");
+            if (out_file.is_open()) {
+                out_file << config.dump(2);
+                out_file.close();
+            } else {
+                std::cerr << "Error: Could not create config/config.json" << std::endl;
+                return 1;
+            }
+        } else {
+            config = json::parse(config_file);
+            config_file.close();
         }
-        config = json::parse(config_file);
     } catch (const std::exception& e) {
         std::cerr << "Error parsing config: " << e.what() << std::endl;
         return 1;
