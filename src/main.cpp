@@ -3,12 +3,14 @@
 #include <QListWidget>
 #include <QPushButton>
 #include <QVBoxLayout>
+#include <QHBoxLayout>
 #include <QClipboard>
 #include <QDrag>
 #include <QMimeData>
 #include <QProcess>
 #include <QMouseEvent>
 #include <nlohmann/json.hpp>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <string>
@@ -112,8 +114,11 @@ public:
         connect(pinButton, &QPushButton::clicked, this, &EasyInfoDropWindow::toggleSticky);
         editButton = new QPushButton("Edit", this);
         connect(editButton, &QPushButton::clicked, this, &EasyInfoDropWindow::openConfig);
+        refreshButton = new QPushButton("Refresh", this);
+        connect(refreshButton, &QPushButton::clicked, this, &EasyInfoDropWindow::refreshConfig);
         buttonLayout->addWidget(pinButton);
         buttonLayout->addWidget(editButton);
+        buttonLayout->addWidget(refreshButton);
         layout->addLayout(buttonLayout);
 
         std::cerr << "EasyInfoDropWindow initialized successfully" << std::endl;
@@ -150,10 +155,28 @@ private slots:
         QString configPath = "config/config.json";
         for (const char* editor : editors) {
             if (QProcess::startDetached(QString::fromUtf8(editor), {configPath})) {
-                std::cerr << "Failed to open editor: " << editor << std::endl;
+                std::cerr << "Opened editor: " << editor << std::endl;
+                return;
             }
+            std::cerr << "Failed to open editor: " << editor << std::endl;
         }
         std::cerr << "Error: No text editor found." << std::endl;
+    }
+
+    void refreshConfig() {
+        try {
+            std::ifstream config_file("config/config.json");
+            if (!config_file.is_open()) {
+                std::cerr << "Error: Could not open config/config.json for refresh" << std::endl;
+                return;
+            }
+            json config = json::parse(config_file);
+            config_file.close();
+            loadFields(config["items"]);
+            std::cerr << "Refreshed config from config/config.json" << std::endl;
+        } catch (const std::exception& e) {
+            std::cerr << "Error refreshing config: " << e.what() << std::endl;
+        }
     }
 
 private:
@@ -182,6 +205,7 @@ private:
     DraggableListWidget* listWidget;
     QPushButton* pinButton;
     QPushButton* editButton;
+    QPushButton* refreshButton;
     bool isSticky = false;
 };
 
@@ -190,7 +214,7 @@ private:
 int main(int argc, char* argv[]) {
     json config;
     try {
-        std::filesystem::create_directories("config"); // Create config directory if it doesn't exist
+        std::filesystem::create_directories("config");
         std::ifstream config_file("config/config.json");
         if (!config_file.is_open()) {
             std::cerr << "Creating default config/config.json" << std::endl;
