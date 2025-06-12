@@ -13,25 +13,23 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: |
+      - name: Install dependencies
+        run: |
           sudo apt-get update
           sudo apt-get install -y qtbase5-dev qt5-qmake libqt5widgets5 libx11-dev cmake build-essential
-      - run: |
+      - name: Configure build
+        run: |
           mkdir build
           cd build
-          cmake ..
-      - run: |
+          cmake -DCMAKE_BUILD_TYPE=Release ..
+      - name: Build
+        run: |
           cd build
           make
       - uses: actions/upload-artifact@v4
         with:
           name: EasyInfoDrop
           path: build/EasyInfoDrop
-          if-no-files-found: error
-      - uses: actions/upload-artifact@v4
-        with:
-          name: config
-          path: config/config.json
           if-no-files-found: error
 
   release:
@@ -44,12 +42,10 @@ jobs:
         with:
           name: EasyInfoDrop
           path: release
-      - uses: actions/download-artifact@v4
-        with:
-          name: config
-          path: release/config
-      - run: chmod +x release/EasyInfoDrop
-      - run: tar -czvf release/EasyInfoDrop-${{ github.ref_name }}-linux.tar.gz -C release EasyInfoDrop config/config.json
+      - name: Create tarball
+        run: |
+          chmod +x release/EasyInfoDrop
+          tar -czvf release/release-easy-info-drop-${{ github.ref_name }}.tar.gz -C release EasyInfoDrop
       - id: create_release
         uses: actions/create-release@v1
         env:
@@ -64,6 +60,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: release/EasyInfoDrop-${{ github.ref_name }}-linux.tar.gz
-          asset_name: release-easy-info-drop-v${{ github.ref_name }}.tar.gz
+          asset_path: release/release-easy-info-drop-${{ github.ref_name }}.tar.gz
+          asset_name: release-easy-info-drop-${{ github.ref_name }}.tar.gz
           asset_content_type: application/gzip
