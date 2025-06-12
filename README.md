@@ -1,5 +1,7 @@
 # EasyInfoDrop
 
+![EasyInfoDrop Demo](EasyInfoDrop.gif)
+
 EasyInfoDrop is a lightweight, Qt-based application designed to streamline your workflow when dealing with repetitive text, such as names, emails, or cover letter snippets. Whether you're filling out web forms, drafting emails, or preparing documents in tools like Microsoft Word, EasyInfoDrop lets you drag and drop pre-configured text directly into your target application, saving time and reducing errors. With a customizable configuration file, you can store and manage frequently used text snippets effortlessly.
 
 ## Features
@@ -24,7 +26,7 @@ chmod +x EasyInfoDrop
 ./EasyInfoDrop
 ```
 
-Replace `<version>` with the specific release version (e.g., `v1.0.5`).
+Replace `<version>` with the specific release version (e.g., `v1.0.0`).
 
 ## Configuration
 
