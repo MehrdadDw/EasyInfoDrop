@@ -15,7 +15,6 @@
 #include <X11/Xlib.h>
 #include <X11/keysym.h>
 
-// Using nlohmann/json for JSON parsing
 using json = nlohmann::json;
 
 class DraggableListWidget : public QListWidget {
@@ -92,35 +91,32 @@ private:
     }
 };
 
-class EasyFormDropWindow : public QMainWindow {
+class EasyInfoDropWindow : public QMainWindow {
     Q_OBJECT
 public:
-    EasyFormDropWindow(const json& config, QWidget* parent = nullptr) : QMainWindow(parent) {
-        setWindowTitle("EasyFormDrop");
+    EasyInfoDropWindow(const json& config, QWidget* parent = nullptr) : QMainWindow(parent) {
+        setWindowTitle("EasyInfoDrop");
         resize(200, 300);
 
-        // Central widget and layout
         QWidget* centralWidget = new QWidget(this);
         QVBoxLayout* layout = new QVBoxLayout(centralWidget);
         setCentralWidget(centralWidget);
 
-        // List widget
         listWidget = new DraggableListWidget(this);
-        loadFields(config["fields"]);
-        connect(listWidget, &QListWidget::itemClicked, this, &EasyFormDropWindow::onItemClicked);
+        loadFields(config["items"]);
+        connect(listWidget, &QListWidget::itemClicked, this, &EasyInfoDropWindow::onItemClicked);
         layout->addWidget(listWidget);
 
-        // Buttons
         QHBoxLayout* buttonLayout = new QHBoxLayout();
         pinButton = new QPushButton("Pin", this);
-        connect(pinButton, &QPushButton::clicked, this, &EasyFormDropWindow::toggleSticky);
+        connect(pinButton, &QPushButton::clicked, this, &EasyInfoDropWindow::toggleSticky);
         editButton = new QPushButton("Edit", this);
-        connect(editButton, &QPushButton::clicked, this, &EasyFormDropWindow::openConfig);
+        connect(editButton, &QPushButton::clicked, this, &EasyInfoDropWindow::openConfig);
         buttonLayout->addWidget(pinButton);
         buttonLayout->addWidget(editButton);
         layout->addLayout(buttonLayout);
 
-        std::cerr << "EasyFormDropWindow initialized successfully" << std::endl;
+        std::cerr << "EasyInfoDropWindow initialized successfully" << std::endl;
     }
 
 private slots:
@@ -145,7 +141,7 @@ private slots:
             pinButton->setText("Pin");
         }
         setWindowFlags(flags);
-        show(); // Re-apply window flags
+        show();
         std::cerr << "Sticky toggled: " << (isSticky ? "Pinned" : "Unpinned") << std::endl;
     }
 
@@ -190,10 +186,9 @@ private:
     bool isSticky = false;
 };
 
-#include "main.moc" // Required for moc processing
+#include "main.moc"
 
 int main(int argc, char* argv[]) {
-    // Load config
     json config;
     try {
         std::ifstream config_file("config/config.json");
@@ -207,9 +202,8 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    // Initialize Qt
     QApplication app(argc, argv);
-    EasyFormDropWindow window(config);
+    EasyInfoDropWindow window(config);
     window.show();
     return app.exec();
 }
