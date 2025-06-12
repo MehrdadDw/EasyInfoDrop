@@ -185,7 +185,8 @@ private:
         for (const auto& field : fields) {
             QString name = QString::fromStdString(field["name"].get<std::string>());
             QString value = QString::fromStdString(field["value"].get<std::string>());
-            QListWidgetItem* item = new QListWidgetItem(name, listWidget);
+            QString truncatedValue = value.left(10) + (value.length() > 10 ? "..." : "");
+            QListWidgetItem* item = new QListWidgetItem(QString("%1 > %2").arg(name, truncatedValue), listWidget);
             item->setData(Qt::UserRole, value);
             item->setToolTip(value);
             std::cerr << "Added item: " << name.toStdString() << " with value: " << value.toStdString() << std::endl;
@@ -220,8 +221,10 @@ int main(int argc, char* argv[]) {
             std::cerr << "Creating default config/config.json" << std::endl;
             config = {
                 {"items", {
-                    {{"name", "Name"}, {"value", "John Doe"}},
-                    {{"name", "Email"}, {"value", "john@example.com"}}
+                    {{"name", "Full Name"}, {"value", "John Doe"}},
+                    {{"name", "Email"}, {"value", "john@example.com"}},
+                    {{"name", "Name"}, {"value", "John"}},
+                    {{"name", "Last Name"}, {"value", "Doe"}}
                 }}
             };
             std::ofstream out_file("config/config.json");
