@@ -1,36 +1,112 @@
-cmake_minimum_required(VERSION 3.16)
-project(EasyInfoDrop LANGUAGES CXX)
+name: CI/CD Pipeline for EasyInfoDrop
 
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_AUTOMOC ON)
-set(CMAKE_AUTORCC ON)
-set(CMAKE_AUTOUIC ON)
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
 
-find_package(Qt5 COMPONENTS Widgets REQUIRED)
-if(NOT Qt5_FOUND)
-    message(FATAL_ERROR "Qt5 Widgets not found. Install qtbase5-dev or qt@5.")
-endif()
+permissions:
+  contents: write
 
-if(NOT APPLE)
-    find_package(X11 REQUIRED)
-    if(NOT X11_FOUND)
-        message(FATAL_ERROR "X11 not found. Install libx11-dev.")
-    endif()
-endif()
+jobs:
+  build-ubuntu:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y qtbase5-dev qt5-qmake libqt5widgets5 libx11-dev cmake build-essential
+      - name: Configure build
+        run: |
+          mkdir build
+          cd build
+          cmake -DCMAKE_BUILD_TYPE=Release ..
+      - name: Build
+        run: |
+          cd build
+          make
+      - name: Debug build output
+        run: |
+          ls -l build/EasyInfoDrop
+      - uses: actions/upload-artifact@v4
+        with:
+          name: EasyInfoDrop-Ubuntu
+          path: build/EasyInfoDrop
+          if-no-files-found: error
 
-include(FetchContent)
-FetchContent_Declare(
-    json
-    URL https://github.com/nlohmann/json/releases/download/v3.11.3/json.tar.xz
-    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
-)
-FetchContent_MakeAvailable(json)
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: |
+          brew install qt@5 cmake
+          echo "Qt5_DIR=$(brew --prefix qt@5)/lib/cmake/Qt5" >> $GITHUB_ENV
+      - name: Configure build
+        run: |
+          mkdir build
+          cd build
+          cmake -DCMAKE_BUILD_TYPE=Release -DQt5_DIR=${{ env.Qt5_DIR }} ..
+      - name: Build
+        run: |
+          cd build
+          make
+      - name: Bundle application
+        run: |
+          cd build
+          $(brew --prefix qt@5)/bin/macdeployqt EasyInfoDrop.app
+          ditto -c -k --sequesterRsrc --keepParent EasyInfoDrop.app EasyInfoDrop-${{ github.ref_name }}-macOS.zip
+      - name: Debug build output
+        run: |
+          ls -lR build/EasyInfoDrop.app
+          ls -l build/EasyInfoDrop-${{ github.ref_name }}-macOS.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: EasyInfoDrop-macOS
+          path: build/EasyInfoDrop-${{ github.ref_name }}-macOS.zip
+          if-no-files-found: error
 
-add_executable(EasyInfoDrop src/main.cpp)
-target_include_directories(EasyInfoDrop PRIVATE ${CMAKE_SOURCE_DIR}/src)
-if(NOT APPLE)
-    target_include_directories(EasyInfoDrop PRIVATE ${X11_INCLUDE_DIR})
-    target_link_libraries(EasyInfoDrop PRIVATE ${X11_LIBRARIES})
-endif()
-target_link_libraries(EasyInfoDrop PRIVATE Qt5::Widgets nlohmann_json::nlohmann_json)
+  release:
+    needs: [build-ubuntu, build-macos]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: EasyInfoDrop-Ubuntu
+          path: release/ubuntu
+      - uses: actions/download-artifact@v4
+        with:
+          name: EasyInfoDrop-macOS
+          path: release/macos
+      - name: Debug file structure
+        run: |
+          ls -R release
+          echo "Checking downloaded artifacts:"
+          find release -type f
+      - name: Create Ubuntu tarball
+        run: |
+          chmod +x release/ubuntu/EasyInfoDrop
+          tar -czvf release/release-easy-info-drop-${{ github.ref_name }}-ubuntu.tar.gz -C release/ubuntu EasyInfoDrop
+          echo "Ubuntu tarball contents:"
+          tar -tzvf release/release-easy-info-drop-${{ github.ref_name }}-ubuntu.tar.gz
+      - name: Create and upload release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+          files: |
+            release/release-easy-info-drop-${{ github.ref_name }}-ubuntu.tar.gz
+            release/macos/EasyInfoDrop-${{ github.ref_name }}-macOS.zip
+          body: |
+            EasyInfoDrop Release ${{ github.ref_name }}
+
+            **Ubuntu**:
+            ```bash
+            tar -xzvf release-easy-info-drop-${{ github.ref_name }}-ubuntu.tar.gz
+            chmod +x EasyInfoDrop
+            ./EasyInfoDrop
