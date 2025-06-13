@@ -14,7 +14,7 @@
 #include <fstream>
 #include <iostream>
 #include <string>
-#ifndef __APPLE__
+#ifdef __linux__
 #include <X11/Xlib.h>
 #include <X11/keysym.h>
 #endif
@@ -53,7 +53,7 @@ private:
         QDrag* drag = new QDrag(this);
         drag->setMimeData(mimeData);
         copyToClipboard(value);
-#ifndef __APPLE__
+#ifdef __linux__
         simulatePaste();
 #endif
         drag->exec(Qt::CopyAction);
@@ -69,7 +69,7 @@ private:
         }
     }
 
-#ifndef __APPLE__
+#ifdef __linux__
     void simulatePaste() {
         Display* display = XOpenDisplay(nullptr);
         if (!display) {
@@ -158,10 +158,12 @@ private slots:
 
     void openConfig() {
         const char* editors[] = {
-#ifdef __APPLE__
+#if defined(__APPLE__)
             "open -t",
+#elif defined(_WIN32)
+            "notepad",
 #else
-            "gedit", "kate", "nano", "notepad",
+            "gedit", "kate", "nano",
 #endif
             nullptr
         };
