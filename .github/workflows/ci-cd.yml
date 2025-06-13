@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 jobs:
-  build:
+  build-ubuntu:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -31,31 +31,75 @@ jobs:
           ls -l build/EasyInfoDrop
       - uses: actions/upload-artifact@v4
         with:
-          name: EasyInfoDrop
+          name: EasyInfoDrop-Ubuntu
           path: build/EasyInfoDrop
           if-no-files-found: error
 
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '5.15.2'
+          host: 'mac'
+          target: 'desktop'
+          arch: 'clang_64'
+          dir: '${{ github.workspace }}/Qt'
+          install-deps: 'true'
+      - name: Install dependencies
+        run: |
+          brew install cmake libx11
+      - name: Configure build
+        run: |
+          mkdir build
+          cd build
+          cmake -DCMAKE_BUILD_TYPE=Release -DQt5_DIR=${{ github.workspace }}/Qt/5.15.2/clang_64/lib/cmake/Qt5 ..
+      - name: Build
+        run: |
+          cd build
+          make
+      - name: Bundle application
+        run: |
+          cd build
+          macdeployqt EasyInfoDrop.app
+          ditto -c -k --sequesterRsrc --keepParent EasyInfoDrop.app EasyInfoDrop-${{ github.ref_name }}-macOS.zip
+      - name: Debug build output
+        run: |
+          ls -l build/EasyInfoDrop.app
+          ls -l build/EasyInfoDrop-${{ github.ref_name }}-macOS.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: EasyInfoDrop-macOS
+          path: build/EasyInfoDrop-${{ github.ref_name }}-macOS.zip
+          if-no-files-found: error
+
   release:
-    needs: build
+    needs: [build-ubuntu, build-macos]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
-          name: EasyInfoDrop
-          path: release
+          name: EasyInfoDrop-Ubuntu
+          path: release/ubuntu
+      - uses: actions/download-artifact@v4
+        with:
+          name: EasyInfoDrop-macOS
+          path: release/macos
       - name: Debug file structure
         run: |
           ls -R release
-          echo "Checking downloaded artifact:"
+          echo "Checking downloaded artifacts:"
           find release -type f
-      - name: Create tarball
+      - name: Create Ubuntu tarball
         run: |
-          chmod +x release/EasyInfoDrop
-          tar -czvf release/release-easy-info-drop-${{ github.ref_name }}.tar.gz -C release EasyInfoDrop
-          echo "Tarball contents:"
-          tar -tzvf release/release-easy-info-drop-${{ github.ref_name }}.tar.gz
+          chmod +x release/ubuntu/EasyInfoDrop
+          tar -czvf release/release-easy-info-drop-${{ github.ref_name }}-ubuntu.tar.gz -C release/ubuntu EasyInfoDrop
+          echo "Ubuntu tarball contents:"
+          tar -tzvf release/release-easy-info-drop-${{ github.ref_name }}-ubuntu.tar.gz
       - name: Create and upload release
         uses: softprops/action-gh-release@v2
         with:
@@ -63,15 +107,23 @@ jobs:
           name: Release ${{ github.ref_name }}
           draft: false
           prerelease: false
-          files: release/release-easy-info-drop-${{ github.ref_name }}.tar.gz
+          files: |
+            release/release-easy-info-drop-${{ github.ref_name }}-ubuntu.tar.gz
+            release/macos/EasyInfoDrop-${{ github.ref_name }}-macOS.zip
           body: |
             EasyInfoDrop Release ${{ github.ref_name }}
 
-            To run:
+            **Ubuntu**:
             ```bash
-            tar -xzvf release-easy-info-drop-${{ github.ref_name }}.tar.gz
+            tar -xzvf release-easy-info-drop-${{ github.ref_name }}-ubuntu.tar.gz
             chmod +x EasyInfoDrop
             ./EasyInfoDrop
+            ```
+
+            **macOS**:
+            ```bash
+            unzip EasyInfoDrop-${{ github.ref_name }}-macOS.zip
+            open EasyInfoDrop.app
             ```
 
             Includes `config/config.json` for immediate use.
