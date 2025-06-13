@@ -14,8 +14,10 @@
 #include <fstream>
 #include <iostream>
 #include <string>
+#ifndef __APPLE__
 #include <X11/Xlib.h>
 #include <X11/keysym.h>
+#endif
 
 using json = nlohmann::json;
 
@@ -51,7 +53,9 @@ private:
         QDrag* drag = new QDrag(this);
         drag->setMimeData(mimeData);
         copyToClipboard(value);
+#ifndef __APPLE__
         simulatePaste();
+#endif
         drag->exec(Qt::CopyAction);
     }
 
@@ -65,6 +69,7 @@ private:
         }
     }
 
+#ifndef __APPLE__
     void simulatePaste() {
         Display* display = XOpenDisplay(nullptr);
         if (!display) {
@@ -91,6 +96,7 @@ private:
         XCloseDisplay(display);
         std::cerr << "Simulated paste event" << std::endl;
     }
+#endif
 };
 
 class EasyInfoDropWindow : public QMainWindow {
@@ -151,7 +157,14 @@ private slots:
     }
 
     void openConfig() {
-        const char* editors[] = {"gedit", "kate", "nano", "notepad", nullptr};
+        const char* editors[] = {
+#ifdef __APPLE__
+            "open -t",
+#else
+            "gedit", "kate", "nano", "notepad",
+#endif
+            nullptr
+        };
         QString configPath = "config/config.json";
         for (const char* editor : editors) {
             if (QProcess::startDetached(QString::fromUtf8(editor), {configPath})) {

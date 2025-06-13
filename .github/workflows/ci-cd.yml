@@ -39,23 +39,15 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Install Qt
-        uses: jurplel/install-qt-action@v4
-        with:
-          version: '5.15.2'
-          host: 'mac'
-          target: 'desktop'
-          arch: 'clang_64'
-          dir: '${{ github.workspace }}/Qt'
-          install-deps: 'true'
       - name: Install dependencies
         run: |
-          brew install cmake libx11
+          brew install qt@5 cmake
+          echo "Qt5_DIR=$(brew --prefix qt@5)/lib/cmake/Qt5" >> $GITHUB_ENV
       - name: Configure build
         run: |
           mkdir build
           cd build
-          cmake -DCMAKE_BUILD_TYPE=Release -DQt5_DIR=${{ github.workspace }}/Qt/5.15.2/clang_64/lib/cmake/Qt5 ..
+          cmake -DCMAKE_BUILD_TYPE=Release -DQt5_DIR=${{ env.Qt5_DIR }} ..
       - name: Build
         run: |
           cd build
@@ -63,7 +55,7 @@ jobs:
       - name: Bundle application
         run: |
           cd build
-          macdeployqt EasyInfoDrop.app
+          $(brew --prefix qt@5)/bin/macdeployqt EasyInfoDrop.app
           ditto -c -k --sequesterRsrc --keepParent EasyInfoDrop.app EasyInfoDrop-${{ github.ref_name }}-macOS.zip
       - name: Debug build output
         run: |
@@ -125,6 +117,8 @@ jobs:
             unzip EasyInfoDrop-${{ github.ref_name }}-macOS.zip
             open EasyInfoDrop.app
             ```
+
+            **Note**: Drag-to-paste functionality is disabled on macOS due to platform limitations. Use click-to-copy instead.
 
             Includes `config/config.json` for immediate use.
         env:
