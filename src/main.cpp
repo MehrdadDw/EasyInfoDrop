@@ -168,7 +168,7 @@ private slots:
         QString configPath = "config/config.json";
         for (const char* editor : editors) {
             if (QProcess::startDetached(QString::fromUtf8(editor), {configPath})) {
-                std::cerr << "Opened editor: " << editor << endl;
+                std::cerr << "Opened editor: " << editor << std::endl;
                 return;
             }
             std::cerr << "Failed to open editor: " << editor << std::endl;
@@ -221,7 +221,6 @@ private:
     QPushButton* editButton;
     QPushButton* refreshButton;
     bool isSticky = false;
-
 };
 
 #include "main.moc"
@@ -236,7 +235,7 @@ int main(int argc, char* argv[]) {
             config = {
                 {"items", {
                     {{"name", "Full Name"}, {"value", "John Doe"}},
-                    {{"name", "Email"}, {"value", "info@example.com"}},
+                    {{"name", "Email"}, {"value", "john@example.com"}},
                     {{"name", "Name"}, {"value", "John"}},
                     {{"name", "Last Name"}, {"value", "Doe"}}
                 }}

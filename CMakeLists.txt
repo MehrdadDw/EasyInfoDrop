@@ -29,9 +29,10 @@ FetchContent_MakeAvailable(json)
 
 if(APPLE)
     add_executable(EasyInfoDrop MACOSX_BUNDLE src/main.cpp)
-    set_target_properties(EasyInfoDrop Says PROPERTIES
+    set_target_properties(EasyInfoDrop PROPERTIES
         MACOSX_BUNDLE TRUE
-        MACOSX_BUNDLE_BUNDLE_NAME "EasyInfoDrop")
+        MACOSX_BUNDLE_BUNDLE_NAME "EasyInfoDrop"
+    )
 else()
     add_executable(EasyInfoDrop src/main.cpp)
 endif()
