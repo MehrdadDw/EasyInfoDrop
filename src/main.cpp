@@ -9,6 +9,10 @@
 #include <QMimeData>
 #include <QProcess>
 #include <QMouseEvent>
+#include <QDialog>
+#include <QLineEdit>
+#include <QFormLayout>
+#include <QMessageBox>
 #include <nlohmann/json.hpp>
 #include <filesystem>
 #include <fstream>
@@ -99,6 +103,39 @@ private:
 #endif
 };
 
+class AddEntryDialog : public QDialog {
+    Q_OBJECT
+public:
+    AddEntryDialog(QWidget* parent = nullptr) : QDialog(parent) {
+        setWindowTitle("Add Entry");
+        QFormLayout* layout = new QFormLayout(this);
+        
+        nameEdit = new QLineEdit(this);
+        valueEdit = new QLineEdit(this);
+        
+        layout->addRow("Name:", nameEdit);
+        layout->addRow("Value:", valueEdit);
+        
+        QHBoxLayout* buttonLayout = new QHBoxLayout();
+        QPushButton* okButton = new QPushButton("OK", this);
+        QPushButton* cancelButton = new QPushButton("Cancel", this);
+        buttonLayout->addWidget(okButton);
+        buttonLayout->addWidget(cancelButton);
+        
+        layout->addRow(buttonLayout);
+        
+        connect(okButton, &QPushButton::clicked, this, &AddEntryDialog::accept);
+        connect(cancelButton, &QPushButton::clicked, this, &AddEntryDialog::reject);
+    }
+
+    QString getName() const { return nameEdit->text(); }
+    QString getValue() const { return valueEdit->text(); }
+
+private:
+    QLineEdit* nameEdit;
+    QLineEdit* valueEdit;
+};
+
 class EasyInfoDropWindow : public QMainWindow {
     Q_OBJECT
 public:
@@ -118,13 +155,17 @@ public:
         QHBoxLayout* buttonLayout = new QHBoxLayout();
         pinButton = new QPushButton("Pin", this);
         connect(pinButton, &QPushButton::clicked, this, &EasyInfoDropWindow::toggleSticky);
-        editButton = new QPushButton("Edit", this);
-        connect(editButton, &QPushButton::clicked, this, &EasyInfoDropWindow::openConfig);
+        
         refreshButton = new QPushButton("Refresh", this);
         connect(refreshButton, &QPushButton::clicked, this, &EasyInfoDropWindow::refreshConfig);
+        addButton = new QPushButton("Add", this);
+        connect(addButton, &QPushButton::clicked, this, &EasyInfoDropWindow::addEntry);
+        deleteButton = new QPushButton("Delete", this);
+        connect(deleteButton, &QPushButton::clicked, this, &EasyInfoDropWindow::deleteEntry);
         buttonLayout->addWidget(pinButton);
-        buttonLayout->addWidget(editButton);
         buttonLayout->addWidget(refreshButton);
+        buttonLayout->addWidget(addButton);
+        buttonLayout->addWidget(deleteButton);
         layout->addLayout(buttonLayout);
 
         std::cerr << "EasyInfoDropWindow initialized successfully" << std::endl;
@@ -156,28 +197,7 @@ private slots:
         std::cerr << "Sticky toggled: " << (isSticky ? "Pinned" : "Unpinned") << std::endl;
     }
 
-    void openConfig() {
-        const char* editors[] = {
-#if defined(__APPLE__)
-            "open -t",
-#elif defined(_WIN32)
-            "notepad",
-#else
-            "gedit", "kate", "nano",
-#endif
-            nullptr
-        };
-        QString configPath = "config/config.json";
-        for (const char* editor : editors) {
-            if (QProcess::startDetached(QString::fromUtf8(editor), {configPath})) {
-                std::cerr << "Opened editor: " << editor << std::endl;
-                return;
-            }
-            std::cerr << "Failed to open editor: " << editor << std::endl;
-        }
-        std::cerr << "Error: No text editor found." << std::endl;
-    }
-
+    
     void refreshConfig() {
         try {
             std::ifstream config_file("config/config.json");
@@ -194,7 +214,99 @@ private slots:
         }
     }
 
+    void addEntry() {
+        AddEntryDialog dialog(this);
+        if (dialog.exec() == QDialog::Accepted) {
+            QString name = dialog.getName();
+            QString value = dialog.getValue();
+            if (name.isEmpty() || value.isEmpty()) {
+                std::cerr << "Add entry cancelled or name/value empty" << std::endl;
+                return;
+            }
+
+            try {
+                std::ifstream config_file("config/config.json");
+                if (!config_file.is_open()) {
+                    std::cerr << "Error: Could not open config/config.json for adding entry" << std::endl;
+                    return;
+                }
+                json config = json::parse(config_file);
+                config_file.close();
+
+                config["items"].push_back({{"name", name.toStdString()}, {"value", value.toStdString()}});
+
+                std::ofstream out_file("config/config.json");
+                if (!out_file.is_open()) {
+                    std::cerr << "Error: Could not open config/config.json for writing" << std::endl;
+                    return;
+                }
+                out_file << config.dump(2);
+                out_file.close();
+
+                loadFields(config["items"]);
+                std::cerr << "Added entry: " << name.toStdString() << " with value: " << value.toStdString() << std::endl;
+            } catch (const std::exception& e) {
+                std::cerr << "Error adding entry: " << e.what() << std::endl;
+            }
+        } else {
+            std::cerr << "Add entry cancelled" << std::endl;
+        }
+    }
+
+    void deleteEntry() {
+        QListWidgetItem* item = listWidget->currentItem();
+        if (!item) {
+            std::cerr << "No item selected for deletion" << std::endl;
+            return;
+        }
+
+        QString name = item->text().split(" > ").first();
+        QMessageBox::StandardButton reply = QMessageBox::question(
+            this,
+            "Confirm Deletion",
+            QString("Are you sure you want to delete the entry '%1'?").arg(name),
+            QMessageBox::Yes | QMessageBox::No
+        );
+
+        if (reply == QMessageBox::No) {
+            std::cerr << "Deletion cancelled for entry: " << name.toStdString() << std::endl;
+            return;
+        }
+
+        try {
+            std::ifstream config_file("config/config.json");
+            if (!config_file.is_open()) {
+                std::cerr << "Error: Could not open config/config.json for deleting entry" << std::endl;
+                return;
+            }
+            json config = json::parse(config_file);
+            config_file.close();
+
+            auto& items = config["items"];
+            for (auto it = items.begin(); it != items.end(); ++it) {
+                if ((*it)["name"].get<std::string>() == name.toStdString()) {
+                    items.erase(it);
+                    break;
+                }
+            }
+
+            std::ofstream out_file("config/config.json");
+            if (!out_file.is_open()) {
+                std::cerr << "Error: Could not open config/config.json for writing" << std::endl;
+                return;
+            }
+            out_file << config.dump(2);
+            out_file.close();
+
+            loadFields(config["items"]);
+            std::cerr << "Deleted entry: " << name.toStdString() << std::endl;
+        } catch (const std::exception& e) {
+            std::cerr << "Error deleting entry: " << e.what() << std::endl;
+        }
+    }
+
 private:
+
     void loadFields(const json& fields) {
         listWidget->clear();
         for (const auto& field : fields) {
@@ -222,6 +334,8 @@ private:
     QPushButton* pinButton;
     QPushButton* editButton;
     QPushButton* refreshButton;
+    QPushButton* addButton;
+    QPushButton* deleteButton;
     bool isSticky = false;
 };
 
