@@ -13,6 +13,7 @@
 #include <QLineEdit>
 #include <QFormLayout>
 #include <QMessageBox>
+#include <QStatusBar>
 #include <nlohmann/json.hpp>
 #include <filesystem>
 #include <fstream>
@@ -49,7 +50,9 @@ protected:
 private:
     void startDrag(QListWidgetItem* item) {
         QString value = item->data(Qt::UserRole).toString();
-        std::cerr << "Starting drag with value: " << value.toStdString() << std::endl;
+        if (QMainWindow* mainWindow = qobject_cast<QMainWindow*>(this->window())) {
+            mainWindow->statusBar()->showMessage(QString("Starting drag with value: %1").arg(value), 5000);
+        }
 
         QMimeData* mimeData = new QMimeData;
         mimeData->setText(value);
@@ -67,9 +70,13 @@ private:
         QClipboard* clipboard = QApplication::clipboard();
         if (clipboard) {
             clipboard->setText(value);
-            std::cerr << "Copied to clipboard: " << value.toStdString() << std::endl;
+            if (QMainWindow* mainWindow = qobject_cast<QMainWindow*>(this->window())) {
+                mainWindow->statusBar()->showMessage(QString("Copied to clipboard: %1").arg(value), 5000);
+            }
         } else {
-            std::cerr << "Failed to get clipboard" << std::endl;
+            if (QMainWindow* mainWindow = qobject_cast<QMainWindow*>(this->window())) {
+                mainWindow->statusBar()->showMessage("Failed to get clipboard", 5000);
+            }
         }
     }
 
@@ -77,7 +84,9 @@ private:
     void simulatePaste() {
         Display* display = XOpenDisplay(nullptr);
         if (!display) {
-            std::cerr << "Error: Cannot open X display." << std::endl;
+            if (QMainWindow* mainWindow = qobject_cast<QMainWindow*>(this->window())) {
+                mainWindow->statusBar()->showMessage("Error: Cannot open X display.", 5000);
+            }
             return;
         }
         Window window = DefaultRootWindow(display);
@@ -98,7 +107,9 @@ private:
         XSendEvent(display, window, True, KeyReleaseMask, (XEvent*)&event);
         XFlush(display);
         XCloseDisplay(display);
-        std::cerr << "Simulated paste event" << std::endl;
+        if (QMainWindow* mainWindow = qobject_cast<QMainWindow*>(this->window())) {
+            mainWindow->statusBar()->showMessage("Simulated paste event", 5000);
+        }
     }
 #endif
 };
@@ -148,14 +159,13 @@ public:
         setCentralWidget(centralWidget);
 
         listWidget = new DraggableListWidget(this);
-        loadFields(config["items"]);
+        loadFields(config.contains("items") && config["items"].is_array() ? config["items"] : json::array());
         connect(listWidget, &QListWidget::itemClicked, this, &EasyInfoDropWindow::onItemClicked);
         layout->addWidget(listWidget);
 
         QHBoxLayout* buttonLayout = new QHBoxLayout();
         pinButton = new QPushButton("Pin", this);
         connect(pinButton, &QPushButton::clicked, this, &EasyInfoDropWindow::toggleSticky);
-        
         refreshButton = new QPushButton("Refresh", this);
         connect(refreshButton, &QPushButton::clicked, this, &EasyInfoDropWindow::refreshConfig);
         addButton = new QPushButton("Add", this);
@@ -168,17 +178,20 @@ public:
         buttonLayout->addWidget(deleteButton);
         layout->addLayout(buttonLayout);
 
-        std::cerr << "EasyInfoDropWindow initialized successfully" << std::endl;
+        // Add status bar
+        QStatusBar* status = new QStatusBar(this);
+        setStatusBar(status);
+        statusBar()->showMessage("EasyInfoDropWindow initialized successfully", 5000);
     }
 
 private slots:
     void onItemClicked(QListWidgetItem* item) {
         if (item) {
             QString value = item->data(Qt::UserRole).toString();
-            std::cerr << "Item clicked, copying value: " << value.toStdString() << std::endl;
+            statusBar()->showMessage(QString("Item clicked, copying value: %1").arg(value), 5000);
             copyToClipboard(value);
         } else {
-            std::cerr << "No item provided to onItemClicked" << std::endl;
+            statusBar()->showMessage("No item provided to onItemClicked", 5000);
         }
     }
 
@@ -194,23 +207,22 @@ private slots:
         }
         setWindowFlags(flags);
         show();
-        std::cerr << "Sticky toggled: " << (isSticky ? "Pinned" : "Unpinned") << std::endl;
+        statusBar()->showMessage(QString("Sticky toggled: %1").arg(isSticky ? "Pinned" : "Unpinned"), 5000);
     }
 
-    
     void refreshConfig() {
         try {
             std::ifstream config_file("config/config.json");
             if (!config_file.is_open()) {
-                std::cerr << "Error: Could not open config/config.json for refresh" << std::endl;
+                statusBar()->showMessage("Error: Could not open config/config.json for refresh", 5000);
                 return;
             }
             json config = json::parse(config_file);
             config_file.close();
-            loadFields(config["items"]);
-            std::cerr << "Refreshed config from config/config.json" << std::endl;
+            loadFields(config.contains("items") && config["items"].is_array() ? config["items"] : json::array());
+            statusBar()->showMessage("Refreshed config from config/config.json", 5000);
         } catch (const std::exception& e) {
-            std::cerr << "Error refreshing config: " << e.what() << std::endl;
+            statusBar()->showMessage(QString("Error refreshing config: %1").arg(e.what()), 5000);
         }
     }
 
@@ -220,43 +232,46 @@ private slots:
             QString name = dialog.getName();
             QString value = dialog.getValue();
             if (name.isEmpty() || value.isEmpty()) {
-                std::cerr << "Add entry cancelled or name/value empty" << std::endl;
+                statusBar()->showMessage("Add entry cancelled or name/value empty", 5000);
                 return;
             }
 
             try {
                 std::ifstream config_file("config/config.json");
                 if (!config_file.is_open()) {
-                    std::cerr << "Error: Could not open config/config.json for adding entry" << std::endl;
+                    statusBar()->showMessage("Error: Could not open config/config.json for adding entry", 5000);
                     return;
                 }
                 json config = json::parse(config_file);
                 config_file.close();
 
+                if (!config.contains("items") || !config["items"].is_array()) {
+                    config["items"] = json::array();
+                }
                 config["items"].push_back({{"name", name.toStdString()}, {"value", value.toStdString()}});
 
                 std::ofstream out_file("config/config.json");
                 if (!out_file.is_open()) {
-                    std::cerr << "Error: Could not open config/config.json for writing" << std::endl;
+                    statusBar()->showMessage("Error: Could not open config/config.json for writing", 5000);
                     return;
                 }
                 out_file << config.dump(2);
                 out_file.close();
 
                 loadFields(config["items"]);
-                std::cerr << "Added entry: " << name.toStdString() << " with value: " << value.toStdString() << std::endl;
+                statusBar()->showMessage(QString("Added entry: %1 with value: %2").arg(name, value), 5000);
             } catch (const std::exception& e) {
-                std::cerr << "Error adding entry: " << e.what() << std::endl;
+                statusBar()->showMessage(QString("Error adding entry: %1").arg(e.what()), 5000);
             }
         } else {
-            std::cerr << "Add entry cancelled" << std::endl;
+            statusBar()->showMessage("Add entry cancelled", 5000);
         }
     }
 
     void deleteEntry() {
         QListWidgetItem* item = listWidget->currentItem();
         if (!item) {
-            std::cerr << "No item selected for deletion" << std::endl;
+            statusBar()->showMessage("No item selected for deletion", 5000);
             return;
         }
 
@@ -269,54 +284,63 @@ private slots:
         );
 
         if (reply == QMessageBox::No) {
-            std::cerr << "Deletion cancelled for entry: " << name.toStdString() << std::endl;
+            statusBar()->showMessage(QString("Deletion cancelled for entry: %1").arg(name), 5000);
             return;
         }
 
         try {
             std::ifstream config_file("config/config.json");
             if (!config_file.is_open()) {
-                std::cerr << "Error: Could not open config/config.json for deleting entry" << std::endl;
+                statusBar()->showMessage("Error: Could not open config/config.json for deleting entry", 5000);
                 return;
             }
             json config = json::parse(config_file);
             config_file.close();
 
-            auto& items = config["items"];
-            for (auto it = items.begin(); it != items.end(); ++it) {
-                if ((*it)["name"].get<std::string>() == name.toStdString()) {
-                    items.erase(it);
-                    break;
+            if (config.contains("items") && config["items"].is_array()) {
+                auto& items = config["items"];
+                for (auto it = items.begin(); it != items.end(); ++it) {
+                    if ((*it)["name"].get<std::string>() == name.toStdString()) {
+                        items.erase(it);
+                        break;
+                    }
                 }
             }
 
             std::ofstream out_file("config/config.json");
             if (!out_file.is_open()) {
-                std::cerr << "Error: Could not open config/config.json for writing" << std::endl;
+                statusBar()->showMessage("Error: Could not open config/config.json for writing", 5000);
                 return;
             }
             out_file << config.dump(2);
             out_file.close();
 
-            loadFields(config["items"]);
-            std::cerr << "Deleted entry: " << name.toStdString() << std::endl;
+            loadFields(config.contains("items") && config["items"].is_array() ? config["items"] : json::array());
+            statusBar()->showMessage(QString("Deleted entry: %1").arg(name), 5000);
         } catch (const std::exception& e) {
-            std::cerr << "Error deleting entry: " << e.what() << std::endl;
+            statusBar()->showMessage(QString("Error deleting entry: %1").arg(e.what()), 5000);
         }
     }
 
 private:
-
     void loadFields(const json& fields) {
         listWidget->clear();
+        if (!fields.is_array()) {
+            statusBar()->showMessage("Error: Config items is not an array", 5000);
+            return;
+        }
         for (const auto& field : fields) {
+            if (!field.is_object() || !field.contains("name") || !field.contains("value")) {
+                statusBar()->showMessage("Error: Invalid item format in config", 5000);
+                continue;
+            }
             QString name = QString::fromStdString(field["name"].get<std::string>());
             QString value = QString::fromStdString(field["value"].get<std::string>());
             QString truncatedValue = value.left(10) + (value.length() > 10 ? "..." : "");
             QListWidgetItem* item = new QListWidgetItem(QString("%1 > %2").arg(name, truncatedValue), listWidget);
             item->setData(Qt::UserRole, value);
             item->setToolTip(value);
-            std::cerr << "Added item: " << name.toStdString() << " with value: " << value.toStdString() << std::endl;
+            statusBar()->showMessage(QString("Added item: %1 with value: %2").arg(name, value), 5000);
         }
     }
 
@@ -324,15 +348,14 @@ private:
         QClipboard* clipboard = QApplication::clipboard();
         if (clipboard) {
             clipboard->setText(value);
-            std::cerr << "Copied to clipboard: " << value.toStdString() << std::endl;
+            statusBar()->showMessage(QString("Copied to clipboard: %1").arg(value), 5000);
         } else {
-            std::cerr << "Failed to get clipboard" << std::endl;
+            statusBar()->showMessage("Failed to get clipboard", 5000);
         }
     }
 
     DraggableListWidget* listWidget;
     QPushButton* pinButton;
-    QPushButton* editButton;
     QPushButton* refreshButton;
     QPushButton* addButton;
     QPushButton* deleteButton;
@@ -342,12 +365,13 @@ private:
 #include "main.moc"
 
 int main(int argc, char* argv[]) {
+    QApplication app(argc, argv);
     json config;
+    QString configPath = QString::fromStdString(std::filesystem::absolute("config/config.json").string());
     try {
         std::filesystem::create_directories("config");
         std::ifstream config_file("config/config.json");
         if (!config_file.is_open()) {
-            std::cerr << "Creating default config/config.json" << std::endl;
             config = {
                 {"items", {
                     {{"name", "Full Name"}, {"value", "John Doe"}},
@@ -357,24 +381,42 @@ int main(int argc, char* argv[]) {
                 }}
             };
             std::ofstream out_file("config/config.json");
-            if (out_file.is_open()) {
-                out_file << config.dump(2);
-                out_file.close();
-            } else {
-                std::cerr << "Error: Could not create config/config.json" << std::endl;
-                return 1;
+            if (!out_file.is_open()) {
+                EasyInfoDropWindow window(config);
+                window.statusBar()->showMessage(QString("Error: Could not create config/config.json at: %1").arg(configPath), 5000);
+                window.show();
+                return app.exec();
             }
+            out_file << config.dump(2);
+            out_file.close();
+            EasyInfoDropWindow window(config);
+            window.statusBar()->showMessage(QString("Config loaded: %1").arg(configPath), 5000);
+            window.show();
+            return app.exec();
         } else {
             config = json::parse(config_file);
             config_file.close();
+            if (!config.is_object()) {
+                config = json::object();
+            }
+            if (!config.contains("items") || !config["items"].is_array()) {
+                config["items"] = json::array();
+            }
+            EasyInfoDropWindow window(config);
+            window.statusBar()->showMessage(QString("Config loaded: %1").arg(configPath), 5000);
+            window.show();
+            return app.exec();
         }
     } catch (const std::exception& e) {
-        std::cerr << "Error parsing config: " << e.what() << std::endl;
-        return 1;
+        if (!config.is_object()) {
+            config = json::object();
+        }
+        if (!config.contains("items") || !config["items"].is_array()) {
+            config["items"] = json::array();
+        }
+        EasyInfoDropWindow window(config);
+        window.statusBar()->showMessage(QString("Error parsing config at %1: %2").arg(configPath, e.what()), 5000);
+        window.show();
+        return app.exec();
     }
-
-    QApplication app(argc, argv);
-    EasyInfoDropWindow window(config);
-    window.show();
-    return app.exec();
 }
