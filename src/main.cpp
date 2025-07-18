@@ -14,6 +14,8 @@
 #include <QFormLayout>
 #include <QMessageBox>
 #include <QStatusBar>
+#include <QMenuBar>
+#include <QActionGroup>
 #include <nlohmann/json.hpp>
 #include <filesystem>
 #include <fstream>
@@ -152,14 +154,15 @@ class EasyInfoDropWindow : public QMainWindow {
 public:
     EasyInfoDropWindow(const json& config, QWidget* parent = nullptr) : QMainWindow(parent) {
         setWindowTitle("EasyInfoDrop");
-        resize(200, 300);
+        resize(300, 300); // Increased for longer display text
 
         QWidget* centralWidget = new QWidget(this);
         QVBoxLayout* layout = new QVBoxLayout(centralWidget);
         setCentralWidget(centralWidget);
 
         listWidget = new DraggableListWidget(this);
-        loadFields(config.contains("items") && config["items"].is_array() ? config["items"] : json::array());
+        currentConfig = config.contains("items") && config["items"].is_array() ? config["items"] : json::array();
+        loadFields(currentConfig);
         connect(listWidget, &QListWidget::itemClicked, this, &EasyInfoDropWindow::onItemClicked);
         layout->addWidget(listWidget);
 
@@ -178,10 +181,28 @@ public:
         buttonLayout->addWidget(deleteButton);
         layout->addLayout(buttonLayout);
 
-        // Add status bar
         QStatusBar* status = new QStatusBar(this);
         setStatusBar(status);
         statusBar()->showMessage("EasyInfoDropWindow initialized successfully", 5000);
+
+        // Add View menu
+        QMenu* viewMenu = menuBar()->addMenu("View");
+        QAction* keysAndValuesAction = new QAction("Keys and Values", this);
+        keysAndValuesAction->setCheckable(true);
+        keysAndValuesAction->setChecked(true); // Default
+        QAction* justValuesAction = new QAction("Just Values", this);
+        justValuesAction->setCheckable(true);
+        viewMenu->addAction(keysAndValuesAction);
+        viewMenu->addAction(justValuesAction);
+
+        QActionGroup* viewGroup = new QActionGroup(this);
+        viewGroup->addAction(keysAndValuesAction);
+        viewGroup->addAction(justValuesAction);
+        viewGroup->setExclusive(true);
+
+        isKeysAndValuesView = true;
+        connect(keysAndValuesAction, &QAction::triggered, this, &EasyInfoDropWindow::switchToKeysAndValues);
+        connect(justValuesAction, &QAction::triggered, this, &EasyInfoDropWindow::switchToJustValues);
     }
 
 private slots:
@@ -219,7 +240,8 @@ private slots:
             }
             json config = json::parse(config_file);
             config_file.close();
-            loadFields(config.contains("items") && config["items"].is_array() ? config["items"] : json::array());
+            currentConfig = config.contains("items") && config["items"].is_array() ? config["items"] : json::array();
+            loadFields(currentConfig);
             statusBar()->showMessage("Refreshed config from config/config.json", 5000);
         } catch (const std::exception& e) {
             statusBar()->showMessage(QString("Error refreshing config: %1").arg(e.what()), 5000);
@@ -258,7 +280,8 @@ private slots:
                 out_file << config.dump(2);
                 out_file.close();
 
-                loadFields(config["items"]);
+                currentConfig = config["items"];
+                loadFields(currentConfig);
                 statusBar()->showMessage(QString("Added entry: %1 with value: %2").arg(name, value), 5000);
             } catch (const std::exception& e) {
                 statusBar()->showMessage(QString("Error adding entry: %1").arg(e.what()), 5000);
@@ -276,6 +299,11 @@ private slots:
         }
 
         QString name = item->text().split(" > ").first();
+        if (isKeysAndValuesView) {
+            name = item->text().split(" > ").first();
+        } else {
+            name = item->data(Qt::UserRole + 1).toString(); // Store name in UserRole + 1
+        }
         QMessageBox::StandardButton reply = QMessageBox::question(
             this,
             "Confirm Deletion",
@@ -315,11 +343,24 @@ private slots:
             out_file << config.dump(2);
             out_file.close();
 
-            loadFields(config.contains("items") && config["items"].is_array() ? config["items"] : json::array());
+            currentConfig = config.contains("items") && config["items"].is_array() ? config["items"] : json::array();
+            loadFields(currentConfig);
             statusBar()->showMessage(QString("Deleted entry: %1").arg(name), 5000);
         } catch (const std::exception& e) {
             statusBar()->showMessage(QString("Error deleting entry: %1").arg(e.what()), 5000);
         }
+    }
+
+    void switchToKeysAndValues() {
+        isKeysAndValuesView = true;
+        loadFields(currentConfig);
+        statusBar()->showMessage("Switched to Keys and Values view", 5000);
+    }
+
+    void switchToJustValues() {
+        isKeysAndValuesView = false;
+        loadFields(currentConfig);
+        statusBar()->showMessage("Switched to Just Values view", 5000);
     }
 
 private:
@@ -336,9 +377,18 @@ private:
             }
             QString name = QString::fromStdString(field["name"].get<std::string>());
             QString value = QString::fromStdString(field["value"].get<std::string>());
-            QString truncatedValue = value.left(10) + (value.length() > 10 ? "..." : "");
-            QListWidgetItem* item = new QListWidgetItem(QString("%1 > %2").arg(name, truncatedValue), listWidget);
+            QString displayValue;
+            if (value.length() > 18) {
+                int len = value.length();
+                int midStart = len / 2 - 3;
+                displayValue = value.left(6) + ".." + value.mid(midStart, 6) + ".." + value.right(6);
+            } else {
+                displayValue = value;
+            }
+            QString displayText = isKeysAndValuesView ? QString("%1 > %2").arg(name, displayValue) : displayValue;
+            QListWidgetItem* item = new QListWidgetItem(displayText, listWidget);
             item->setData(Qt::UserRole, value);
+            item->setData(Qt::UserRole + 1, name); // Store name for deletion in Just Values mode
             item->setToolTip(value);
             statusBar()->showMessage(QString("Added item: %1 with value: %2").arg(name, value), 5000);
         }
@@ -360,6 +410,8 @@ private:
     QPushButton* addButton;
     QPushButton* deleteButton;
     bool isSticky = false;
+    bool isKeysAndValuesView;
+    json currentConfig;
 };
 
 #include "main.moc"
@@ -374,7 +426,7 @@ int main(int argc, char* argv[]) {
         if (!config_file.is_open()) {
             config = {
                 {"items", {
-                    {{"name", "Full Name"}, {"value", "John Doe"}},
+                    {{"name", "Full Name"}, {"value", "Joooooooooohn Dooooooooooe"}},
                     {{"name", "Email"}, {"value", "john@example.com"}},
                     {{"name", "Name"}, {"value", "John"}},
                     {{"name", "Last Name"}, {"value", "Doe"}}
